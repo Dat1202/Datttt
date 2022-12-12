@@ -1,0 +1,61 @@
+<!--    HEADER-->
+    <div class="header-container">
+        <div id="header" class="flex-run">
+            
+            <a class="logo-shop header" style="
+                display: flex;
+                justify-content: right;
+                align-items: center;
+                padding-right: 42px;
+                padding-bottom: 10px;"
+                href="/">
+                <img src="{{url_for('static', filename='images/logo.png')}}" style="width: 64px; height: 64px">
+            </a>
+<!--            <span class="logo-shop header" style="height: 30%">BOOK</span>-->
+
+            <span class="header" >
+                <form class="d-flex input-group" style="width: 500px; height: 40px; ">
+                    <input
+                      action="/"
+                      name="keyword"
+                      type="search"
+                      class="form-control"
+                      placeholder="Tìm kiếm sách"
+                      aria-label="Search"
+                      aria-describedby="search-addon"
+                      autocomplete="off"
+                    />
+                    <button class="search__btn input-group-text" id="search-addon" type="submit">
+                        <i class="search__btn-icon fas fa-search"></i>
+                    </button>
+                </form>
+            </span>
+
+            <span class="login-header">
+                <div class="header__shop-cart">
+                    <div class="header__shop-cart-wrap">
+                        <a href="{{url_for('cart')}}">
+                            <i class="shopping_icon fas fa-shopping-cart"></i>
+                        </a>
+                         <span class="cart-notice badge badge-info" >{{cart_stats.total_quantity}}</span>
+                    </div>
+                </div>
+                {% if current_user.is_authenticated%}
+                    <a href="{{url_for('home')}}" class="login-btn">
+                        {% if current_user.avatar %}
+                            <img src="{{ current_user.avatar }}" class="rounded-circle" width="20px" alt="{{ current_user.name }}">
+                        {% else %}
+                            <img width="20px" src="{{ url_for('static', filename='images/flask.png') }}" class="rounded-circle" alt="{{ current_user.name }}">
+                        {% endif %}
+                            {{ current_user.username }}
+                    </a>
+                    <a href="{{url_for('user_signout')}}" class="login-btn">Đăng xuất</a>
+                {% else %}
+                    <a href="{{url_for('user_signin')}}" class="login-btn">Đăng nhập</a>
+<!--                    <a href="{{url_for('user_register')}}" class="login-btn">Đăng ký</a>-->
+                {% endif %}
+            </span>
+
+        </div>
+    </div>
+<!--    END HEADER-->
