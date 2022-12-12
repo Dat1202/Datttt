@@ -1,13 +1,18 @@
 {% extends 'layout/layout.html' %}
 
-{% block title %} Đăng nhập {% endblock %}
+{% block title %} Đăng nhập Quản lý kho{% endblock %}
 {% block css %}
 <link rel="stylesheet" href="{{url_for('static', filename='css/content.css')}}">
 {% endblock %}
 
 
+{% block header %}
+  {% include 'inventory/inven_header.html' %}
+{% endblock %}
+
+
 {% block content %}
-  <h1 class="text-center text-danger" style="margin-bottom: 20px">Đăng nhập</h1>
+  <h1 class="text-center text-danger" style="margin-bottom: 20px">Đăng nhập Quản lý kho</h1>
 
 {% if err_msg %}
 <div class="alert alert-danger text-center">
@@ -15,7 +20,7 @@
 </div>
 {% endif %}
   <div class="algin-form-center">
-  <form method="post" action="{{url_for('user_signin')}}" class="authen">
+  <form method="post" action="{{url_for('signin_inventory')}}" class="authen">
     <div class="form-group">
       <label for="username" class="form-lable">Tên đăng nhập</label>
       <input type="text" class="form-control" id="username" name="username" placeholder="Nhập Tên đăng nhập" required>
@@ -25,10 +30,6 @@
       <input type="password" class="form-control" id="password" name="password" placeholder="Nhập Mật khẩu" required>
     </div>
     <input type="submit" value="Đăng nhập" class="btn login-button">
-
-    <div class="form-lable choose-other" style="font-size: 14px; font-weight: 400; margin-top: 8px">
-      Chưa có tài khoản? <a href="{{url_for('user_register')}}">Đăng kí</a> ngay!!!
-    </div>
   </form>
     </div>
 {% endblock %}

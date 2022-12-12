@@ -1,26 +1,27 @@
-# CONTROLLER
+#CONTROLLER
+import distutils
+
 from flask import render_template, request, redirect, url_for, session, jsonify
 from bookstore import app, login
 import utils
 import math
-from flask_login import login_user, logout_user, login_required
-import cloudinary.uploader
 from models import UserRole
+from datetime import date
+from flask_login import login_user, logout_user, login_required, current_user
+import cloudinary.uploader
 
 
 @app.route("/")
 def home():
-    nav_index = 0
-    books = utils.load_books()
     gens = utils.load_genres()
 
     genre_id = request.args.get('genre_id')
     kw = request.args.get('keyword')
     from_price = request.args.get('from_price')
     to_price = request.args.get('to_price')
-    if genre_id:
-        nav_index = int(genre_id)
     page = request.args.get('page', 1)
+    sort_high_to_low = request.args.get('htl')
+
 
     counter = utils.count_books()
     books = utils.load_books(genre_id=genre_id,
@@ -29,11 +30,16 @@ def home():
                              to_price=to_price,
                              page=int(page))
 
+    books = sorted(books, key=lambda x: x.price)
+
+    if sort_high_to_low: 
+        if bool(int(sort_high_to_low)):
+            books = sorted(books, key=lambda x: x.price, reverse=True)
+
     return render_template('index.html',
                            genres=gens,
                            books=books,
-                           index=nav_index,
-                           page=math.ceil(counter / app.config['PAGE_SIZE']), )
+                           page=math.ceil(counter/app.config['PAGE_SIZE']),)
 
 
 @app.route('/register', methods=['get', 'post'])
@@ -79,27 +85,13 @@ def user_signin():
         user = utils.check_login(username=username, password=password)
         if user:
             login_user(user=user)
+            url_next = request.args.get('next')
 
-            next = request.args.get('next', 'home')
-            return redirect(url_for(next))
+            return redirect(url_next if url_next else '/')
         else:
             err_msg = 'Thông tin đăng nhập KHÔNG chính xác!!!'
 
     return render_template('login.html', err_msg=err_msg)
-
-
-@app.route('/admin-login', methods=['post'])
-def signin_admin():
-    username = request.form.get('username')
-    password = request.form.get('password')
-
-    user = utils.check_login(username=username,
-                             password=password,
-                             role=UserRole.ADMIN)
-    if user:
-        login_user(user=user)
-
-    return redirect('/admin')
 
 
 @app.route('/user-logout')
@@ -111,7 +103,11 @@ def user_signout():
 @app.route('/books/<int:book_id>')
 def book_detail(book_id):
     book = utils.get_book_by_id(book_id)
-    return render_template('details.html', b=book)
+    comments = utils.get_comments(request.args.get('page', 1), book_id)
+
+    return render_template('details.html',
+                           comments=comments,
+                           b=book)
 
 
 @login.user_loader
@@ -119,82 +115,86 @@ def user_load(user_id):
     return utils.get_user_by_id(user_id=user_id)
 
 
-@app.route('/api/pay', methods=['POST'])
+@app.route('/api/comments', methods=['post', 'get'])
 @login_required
-def pay():
+def add_comment():
+    data = request.json
+    content = data.get('content')
+    book_id = int(data.get('book_id'))
+
     try:
-        utils.add_receipt(session.get('cart'))
-        del session['cart']
+        c = utils.add_comment(content=content, book_id=book_id)
     except:
-        return jsonify({'code': 400})
+        return {'status': 404, 'err_msg': 'Có lỗi xảy ra! Vui lòng thử lại sau.'}
 
-    return jsonify({'code': 200})
-
-
-@app.context_processor
-def common_reponse():
-    return {
-        'cart_stats' : utils.count_cart(session.get('cart'))
-    }
-
-@app.route('/cart')
-def cart():
-    return render_template('cart.html',
-                           stats=utils.count_cart(session.get('cart')))
+    return {'status': 201,
+            'comment': {
+                'id': c.id,
+                'content': c.content,
+                'created_date': str(c.created_date),
+                'user': {
+                    'username': current_user.username,
+                    'avatar': current_user.avatar,
+                    'name': current_user.name
+                }
+            }}
 
 
-@app.route('/api/add-cart', methods=['POST'])
-def add_to_cart():
-    data = request.json
-    id = str(data.get('id'))
-    name = data.get('name')
-    price = data.get('price')
+@app.route('/inventory', methods=['post', 'get'])
+def inventory():
+    msg = ''
+    if request.method.__eq__('POST'):
+        checkboxes = request.form.getlist('book')
+        numbers = request.form.getlist('number')
+        if checkboxes:
+            x = 0
+            for c in checkboxes:
+                mess = utils.cap_nhat_hang_ton(c, numbers[++x])
 
-    cart = session.get('cart')
-    if not cart:
-        cart = {}
+            if mess:
+                msg = 'Cập nhật thành công'
+            else:
+                msg = 'Đã xảy ra lỗi, vui lòng thử lại sau'
 
-    if id in cart:
-        cart[id]['quantity'] = cart[id]['quantity'] + 1
-    else:
-        cart[id] = {
-            'id': id,
-            'name': name,
-            'price': price,
-            'quantity': 1
-        }
+        redirect(url_for('inventory'))
 
-    session['cart'] = cart
+    genres = utils.load_genres()
+    books = utils.get_hang_ton_co_the_nhap()
+    quy_dinh = utils.read_quy_dinh()
 
-    return jsonify(utils.count_cart(cart))
-
-@app.route('/api/update-cart', methods=['put'])
-def update_cart():
-    data = request.json
-    id = str(data.get('id'))
-    quantity = data.get('quantity')
-
-    cart = session.get('cart')
-    if cart and id in cart:
-        cart[id]['quantity'] = quantity
-        session['cart'] = cart
-
-    return jsonify(utils.count_cart(cart))
+    min_num = 300
+    for j in quy_dinh:
+        if j['id'] == 2:
+            min_num = j['value']
 
 
-@app.route('/api/delete-cart/<book_id>', methods=['delete'])
-def delete_cart(book_id):
-    cart = session.get('cart')
+    return render_template('inventory/inventory.html',
+                           books=books,
+                           genres=genres,
+                           min_num=min_num,
+                           date=date.today(),
+                           msg=msg)
 
-    if cart and book_id in cart:
-        del cart[book_id]
-        session['cart'] = cart
 
-    return jsonify(utils.count_cart(cart))
+@app.route('/inventory-login', methods=['post', 'get'])
+def signin_inventory():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        user = utils.check_login(username=username,
+                                 password=password,
+                                 role=UserRole.INVENT_MANAGE)
+        if user:
+            login_user(user=user)
+
+        return redirect('/inventory')
+
+    return render_template('inventory/login_inventory.html')
+
 
 
 
 if __name__ == '__main__':
     from bookstore.admin import *
-
     app.run(debug=True)
